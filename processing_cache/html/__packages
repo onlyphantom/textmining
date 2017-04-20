@@ -1,0 +1,9 @@
+base
+jsonlite
+NLP
+tm
+SnowballC
+syuzhet
+RColorBrewer
+wordcloud
+ggplot2

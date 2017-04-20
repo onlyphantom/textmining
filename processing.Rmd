@@ -1,0 +1,270 @@
+---
+title: 'Beginner''s Introduction to Text Mining: An App Store Reviews Exercise'
+author: "Samuel Chan"
+date: "20 April 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Foreword
+This notebook is written as a workshop material for a session by [Plug and Play Indonesia](http://apac.plugandplaytechcenter.com/indonesia/). The workshop is part of a series that serve as an introduction to data science and machine learning, and its intended audience are novices as well as junior professionals in the field of data science. Plug and Play is an accelerator for mobile startups, and as such, I have chosen to show application of text mining techniques and capabilities in processing app store reviews. 
+
+With the context set, this is perhaps a good time to explain the motivation of this programming exercise. I work for the company [HyperGrowth](https://hypergrowth.co), and among other things, we develop automation tools for mobile app businesses. One of our product is [GrowthBot](http://growthbot.ai), a free automation chatbot that deliver growth metrics, app reviews, and performance scorecards to mobile marketers. Our customers use GrowthBot to better analyze and manage (_reply to_) user reviews of their apps, and the advantages are plenty: accurate market feedback, faster product iteration, and an unparalled timeliness in responding to users' needs and feedback. This notebook aims to unpack some of these concepts and show how we can utilize R and some simple text mining packages to:
+
+* Process text retrieve from a web service endpoint   
+    + Converting JSON to R
+* Data cleansing and content transformation techniques  
+    + Compare pre- and post-processed data
+* Find the top 10 most frequent keywords  
+    + Easily find keywords that appear >100 times  
+* Generate a wordcloud  
+* Extracts sentiment  
+    + Visualize sentiment  
+    + Compare sentiment(s) between 2 apps using ggplot  
+* Checking corrrelations between words  
+* Custom stopwords, custom content transformer and the role of domain knowledge  
+
+# Preparing the Data
+Some initial configuration. As a safety precaution we also clear our global environment.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+rm(list=ls())
+```
+
+## Load the necessary library and retrieving our data
+```{r cache=TRUE, warning=FALSE}
+library(jsonlite)
+library(tm)
+library(SnowballC)
+library(syuzhet)
+library(wordcloud)
+library(ggplot2)
+
+url <- "http://bot.hypergrowth.co:3005/reviews"
+raw <- readLines(url)
+rd <- fromJSON(raw)[2]
+rd <- rd$data
+```
+
+It's important we recognize here that R itself is developed as a statistical programming language and we're adding text mining capabilities to this language through the use of packages, developed independently by developers within the community. Every time we launch this project, we have to install those packages into our 'environment':
+
+1. `jsonlite` - Convert JSON data into R objects  
+2. `tm` - A text mining package. [Comprehensive documentation here](http://cran.r-project.org/web/packages/tm/vignettes/tm.pdf)  
+3. `SnowballC` - Word stemming  
+4. `syuzhet` - Extracting sentiments  
+5. `wordcloud` - Generate wordcloud (surprised?)  
+6. `ggplot2` - Data visualization based on the grammar of graphics. [A ggplot2 cheatsheet, also by me](https://github.com/onlyphantom/ggplot2cheatsheet)  
+
+## Pre-processing and Data Cleaning
+Most of the time the data we get from an API isn't conveniently structured in the format that is suited for our analysis. In this example, the data we get includes a non-insignificant amount of duplication. As we will later see, we need to remove the duplicated reviews and also apply a range of transformative functions to clean up our data.
+
+To see a list of all transformations that come with the `tm` package:
+```{r eval=FALSE}
+getTransformations()
+```
+
+
+```{r}
+# Remove duplicated reviews
+df <- rd[!duplicated(rd$comment), ]
+
+# Convert df$comment to a Corpus vector
+docs <- Corpus(VectorSource(df$comment))
+
+#lapply return a list. We want just the $content of each Corpus object and not the meta data
+cont <- lapply(docs, function(x){x$content})
+
+# Clean up and remove "/", "@" etc with empty spaces from our Corpus
+transformer <- content_transformer(function(x, pattern)
+    gsub(pattern, " ", x)
+  )
+
+docs <- tm_map(docs, transformer, "/")
+docs <- tm_map(docs, transformer, "@")
+docs <- tm_map(docs, transformer, "\\|")
+docs <- tm_map(docs, content_transformer(tolower))
+docs <- tm_map(docs, removeNumbers)
+docs <- tm_map(docs, removeWords, stopwords("english"))
+docs <- tm_map(docs, removePunctuation)
+docs <- tm_map(docs, stripWhitespace)
+
+```
+
+### Stemming vs Lemmatization
+Stemming refers to a crude heuristic process that chops off the ends of words in the hope of achieving this goal correctly most of the time. For example, _packages_, _packaging_, and _packaged_ will result in _packag_. This process is crude but the overall benefit gained from stemming usually more than makes up for the downside of its special cases. Let's see stemming in action:
+
+```{r}
+print(writeLines(as.character(docs[[10]])) + writeLines(as.character(docs[[25]])) + writeLines(as.character(docs[[50]])))
+```
+
+After stemming:
+```{r}
+docs.s <- tm_map(docs, stemDocument, mc.cores=1)
+print(writeLines(as.character(docs.s[[10]])) + writeLines(as.character(docs.s[[25]])) + writeLines(as.character(docs.s[[50]])))
+```
+
+Lemmatization on the other hand, aims to doing things properly with the use of a vocabulary and grammatical context, thus aiming to remove inflectional endings only and to return the base or dictionary form of a word, which is known as the _lemma_. A popular R package for dealing with that is `koRpus`, which makes the `TreeTagger`(Helmut Schmid, Institute for Computational Linguistics of the University of Stuttgart) functionality available to us. Among other things, determining the _lemma_ of a word requires knowledge of its [part of speech](https://en.wikipedia.org/wiki/Part_of_speech) (POS), and POS taggers for both Bahasa Indonesia and English are available as open source projects -- although that is an entirely different subject which we have to cover next time. 
+
+## Exploratory text mining
+### Document Term Matrix
+When we create a document term matrix (dtm), we're actually creating a matrix that list all occurrences of words, with each document (app review) taking a row. Naturally then, the terms that appear in the body of each app review is represented by columns. If a word occurs in a particular document once, the matrix entry corresponding to that row and column will be 1. If it appears twice, it will be recorded as 2. 
+```{r}
+# Create the document term matrix
+dtm <- TermDocumentMatrix(docs)
+mat <- as.matrix(dtm)
+
+# sort by frequency and print the first 10
+v <- sort(rowSums(mat), decreasing=TRUE)
+d <- data.frame(word = names(v), freq=v)
+head(d, 10)
+```
+Notice how a DTM essentially converts a corpus of text into a mathematical object that can be analyzed using quantitative techniques of matrix algebra, allowing us to apply mathematical functions such as `colSums` and `length` etc.
+
+### Wordcloud
+If up to this point, all of this seems dry and boring, we can spice things up using a wordcloud. The function itself is very straightforward and we can specify a few parameters to control the generation of our wordcloud. Probably the only one that needs a little more clarification is our `rot.per` parameter, which specifies the percentage of words we want to be plotted vertically.
+```{r warning=FALSE}
+# Generate a word cloud
+set.seed(417)
+wordcloud(words = d$word, freq = d$freq, min.freq = 3, max.words = 250, random.order = FALSE, rot.per = 0.35, colors=brewer.pal(8, "Dark2"))
+```
+
+It's also a good time to point out that we could, if we want something less fancy (or more structured), as easily get a list of keywords that occur say at least _100_ times in the entire corpus. This is done by passing in a `dtm` to the `findFreqTerms()` function:
+
+```{r}
+findFreqTerms(dtm, lowfreq=100)
+```
+
+## Sentiment Analysis
+When it comes to text sentiment, one of the most helpful package is the `syuzhet` package. We call `get_nrc_sentiment` on the vector that contains all our app review body, and add a new column with our sentiment score onto it. We'll call the resulting dataframe `text`. 
+
+Once that is done, we sum by column each of these sentiments (col 2 to col11). We then use `ggplot` to visualize our overall sentiment score.
+```{r}
+# fetch sentiment words from war pirates
+wp.c <- df[df$app_id == "net.gogame.games.warpirates", 3]
+sentiment <- get_nrc_sentiment(wp.c)
+text <- cbind(wp.c, sentiment)
+
+# total sentiment score by category
+total.sentiment <- data.frame(colSums(text[, c(2:11)]))
+names(total.sentiment) <- "count"
+total.sentiment <- cbind("sentiment" = rownames(total.sentiment), total.sentiment)
+rownames(total.sentiment) <- NULL
+
+# total sentiment score of all text
+ggplot(data=total.sentiment, aes(x=sentiment, y=count))+geom_bar(aes(fill=sentiment), stat="identity")+theme(legend.position="none") + xlab("Sentiment") + ylab("Total Count") + ggtitle("Total sentiment score") 
+
+```
+
+If you are intrigue or interested in the inner workings of the sentiment-sorting library, I'd encourage you to dive deeper with the `syuzhet` library
+```{r}
+# Get sentiment of the word hate
+get_nrc_sentiment("hate")
+# or the word cool
+get_nrc_sentiment("cool")
+```
+
+We could have done the above, but instead perform the analysis on two specific subsets of our data. We'll compare the sentiments of app reviews sampled from War Pirates and Disney: Crossy Road, two mobile games from our friends at [goGame](https://gogame.net/).
+```{r}
+# fetch sentiment words from war pirates
+wp.c <- df[df$app_id == "net.gogame.games.warpirates", 3]
+dcr.c <- df[df$app_id == "net.gogame.disney.crossyroad", 3]
+
+sentiment.wp <- get_nrc_sentiment(wp.c)
+text.wp <- cbind(wp.c, sentiment.wp)
+sentiment.dcr <- get_nrc_sentiment(dcr.c)
+text.dcr <- cbind(dcr.c, sentiment.dcr)
+
+# total sentiment score by category for War Pirates
+total.sentiment.wp <- data.frame(colSums(text.wp[, c(2:11)]))
+names(total.sentiment.wp) <- "count"
+total.sentiment.wp <- cbind("sentiment" = rownames(total.sentiment.wp), total.sentiment.wp)
+rownames(total.sentiment.wp) <- NULL
+
+# total sentiment score by category for Disney Crossy Road
+total.sentiment.dcr <- data.frame(colSums(text.dcr[, c(2:11)]))
+names(total.sentiment.dcr) <- "count"
+total.sentiment.dcr <- cbind("sentiment" = rownames(total.sentiment.dcr), total.sentiment.dcr)
+rownames(total.sentiment.dcr) <- NULL
+
+sentiment.df <- rbind(data.frame(fill="Disney Crossy Road", obs=total.sentiment.dcr), data.frame(fill="War Pirates", obs=total.sentiment.wp))
+
+# total sentiment score of all text between DCR and WP
+ggplot(data=sentiment.df, aes(x=obs.sentiment, y=obs.count))+geom_bar(aes(fill=fill), stat="identity", position="dodge")+theme(legend.position="bottom") + xlab("Sentiment") + ylab("Total Count") + ggtitle("Total sentiment score") 
+
+```
+
+## Exercise: Top 10 keywords and wordcloud comparison
+Without referring to the code below, you should hopefully be able to complete a simple exercise: Create two top 10 keyword list and their respective wordcloud for each of the two apps (or any two apps of your choice, really)
+```{r}
+# Create the document term matrix
+
+docs.wp <- Corpus(VectorSource(df[df$app_id == "net.gogame.games.warpirates",3]))
+docs.wp <- tm_map(docs.wp, removeWords, stopwords("english"))
+
+docs.dcr <- Corpus(VectorSource(df[df$app_id == "net.gogame.disney.crossyroad",3]))
+docs.dcr <- tm_map(docs.dcr, removeWords, stopwords("english"))
+
+dtm.wp <- TermDocumentMatrix(docs.wp)
+dtm.dcr <- TermDocumentMatrix(docs.dcr)
+mat.wp <- as.matrix(dtm.wp)
+mat.dcr <- as.matrix(dtm.dcr)
+
+# convert to dataframe
+sum.wp <- as.data.frame(sort(rowSums(mat.wp), decreasing = TRUE))
+sum.dcr <- as.data.frame(sort(rowSums(mat.dcr), decreasing=TRUE))
+
+# Top 20 keywords for war pirates and disney crossy road
+# head(sum.wp, 20)
+# head(sum.dcr,20)
+
+freq.df <- as.data.frame(cbind(head(sum.wp,20), head(sum.dcr,20)))
+freq.df
+```
+
+### Bonus: Correlations
+Another technique: We can inspect `correlations` between any interesting words. For example, if we see that the word _error_ occurs in many of War Pirates review and are curious to learn what other common words co-occur with that:
+```{r}
+# Assuming a search term co-occurence of 0.6
+findAssocs(dtm.wp, "error",0.6)
+```
+
+```{r}
+findAssocs(dtm.wp, "loading",0.6)
+```
+Using association rules, we can create a very rudimentary but completely functional set of auto-completion features for customer support forms, search forms etc. 
+
+Notice that as we create our own wordcloud, we omit some other stop words (key phrases that are "noise" i.e not contributing to us understanding data better). using your domain expertise, what are some other stop words we could have selected?
+```{r}
+set.seed(417)
+# wordcloud(words = d$word, freq = d$freq, min.freq = 5, max.words = 250, random.order = FALSE, rot.per = 0.35, colors=brewer.pal(8, "Dark2"))
+
+wp.v <- sort(rowSums(mat.wp), decreasing=TRUE)
+wp.df <- data.frame(word=names(wp.v), freq=wp.v)
+
+dcr.v <- sort(rowSums(mat.dcr), decreasing=TRUE)
+dcr.df <- data.frame(word=names(dcr.v), freq=dcr.v)
+
+# Also: remove some other common stopwords because it's not helpful
+wp.df <- wp.df[wp.df$word != "game" & wp.df$word != "will" & wp.df$word != "get", ]
+dcr.df <- dcr.df[dcr.df$word != "game",]
+
+wordcloud(words = wp.df$word, freq = wp.df$freq, min.freq = 3, max.words = 250, random.order = FALSE, rot.per = 0.35, colors=brewer.pal(8, "Paired"), scale=c(4,.15))
+```
+
+```{r}
+wordcloud(words = dcr.df$word, freq = dcr.df$freq, min.freq = 2, max.words = 250, random.order = FALSE, rot.per = 0.35, colors=brewer.pal(8, "Paired"), scale=c(4,.5))
+```
+
+# Where to go from here
+Congratulations on making it this far! We've seen first hand how we can use various text mining techniques to make sense of a varied pool of app reviews data, deriving useful information from a wealth of unprocessed data. Depending on your interest and use-case, a good next step could be a more technical read of [stemming and lemmatization](https://nlp.stanford.edu/IR-book/html/htmledition/stemming-and-lemmatization-1.html), or expand on what we've learn in associated keywords to build a rudimentary predictive auto-completion feature. We could also study our top keywords in more depth and find patterns that could be useful in helping us determine some broad categories to classify each review into, e.g. Technical Bugs, Praise, Levels Difficulty, Payment Issues etc. The specific discpline that deals with that is known more formally as 'cluster analysis', and could go a long way to help us set automation rules when it comes to dealing with customer feedback and app reviews.
+
+## Feedback
+- Reach me on [Facebook](https://www.facebook.com/samuel.hypergrowth)
+
+- Or my email: samuel [at] hypergrowth.co
+
+- Learn more about GrowthBot, the chatbot that creates performance scorecards using app reviews, perform sentiment analysis, and automate your app marketing workflow: [GrowthBot's Main Website](http://growthbot.ai)
+
+
+
