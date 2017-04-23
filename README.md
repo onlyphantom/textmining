@@ -1,6 +1,8 @@
 # Beginner\'s Introduction to Text Mining: An App Store Reviews Exercise
 This notebook is written as a workshop material for a session by [Plug and Play Indonesia](http://apac.plugandplaytechcenter.com/indonesia/). The workshop is part of a series that serve as an introduction to data science and machine learning, and its intended audience are novices as well as junior professionals in the field of data science. Plug and Play is an accelerator for mobile startups, and as such, I have chosen to show application of text mining techniques and capabilities in processing app store reviews. 
 
+![](textmining.png)
+
 # Challenge
 I work for the company [HyperGrowth](https://hypergrowth.co), and among other things, we develop automation tools for mobile app businesses. One of our product is [GrowthBot](http://growthbot.ai), a free automation chatbot that deliver growth metrics, app reviews, and performance scorecards to mobile marketers. Our customers use GrowthBot to better analyze and manage (_reply to_) user reviews of their apps, and the advantages are plenty: accurate market feedback, faster product iteration, and an unparalled timeliness in responding to users' needs and feedback. This notebook aims to unpack some of these concepts and show how we can utilize R and some simple text mining packages to:
 
