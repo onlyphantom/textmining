@@ -260,11 +260,14 @@ wordcloud(words = dcr.df$word, freq = dcr.df$freq, min.freq = 2, max.words = 250
 Congratulations on making it this far! We've seen first hand how we can use various text mining techniques to make sense of a varied pool of app reviews data, deriving useful information from a wealth of unprocessed data. Depending on your interest and use-case, a good next step could be a more technical read of [stemming and lemmatization](https://nlp.stanford.edu/IR-book/html/htmledition/stemming-and-lemmatization-1.html), or expand on what we've learn in associated keywords to build a rudimentary predictive auto-completion feature. We could also study our top keywords in more depth and find patterns that could be useful in helping us determine some broad categories to classify each review into, e.g. Technical Bugs, Praise, Levels Difficulty, Payment Issues etc. The specific discpline that deals with that is known more formally as 'cluster analysis', and could go a long way to help us set automation rules when it comes to dealing with customer feedback and app reviews.
 
 ## Feedback
-- Reach me on [Facebook](https://www.facebook.com/samuel.hypergrowth)
+- Reach me on [Facebook](https://www.facebook.com/onlyphantom)
 
-- Or my email: samuel [at] hypergrowth.co
+- Or my email: samuel [at] hypergrowth.co (Inactive)
 
 - Learn more about GrowthBot, the chatbot that creates performance scorecards using app reviews, perform sentiment analysis, and automate your app marketing workflow: [GrowthBot's Main Website](http://growthbot.ai)
 
+## Updates
+I have since left the team at HyperGrowth and GrowthBot (GrowthBot's tech is sold to one of our investors and our customer-facing APIs / apps are no longer in service). My email is now inactive. I'm working at [Algoritma](https://algorit.ma) as a course producer teaching an ever larger community about R programming, Python programming, NLP, Machine Learning and Visualization. Connect with my on [Facebook](https://www.facebook.com/onlyphantom) or on [my LinkedIn](https://www.linkedin.com/in/chansamuel/) page instead. 
 
+Enjoy programming!
 
