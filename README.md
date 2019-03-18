@@ -33,3 +33,8 @@ Courtesy of the bot development team at [HyperGrowth](https://hypergrowth.co)
 
 # Project structure
 The project is completed using R notebook, and exported to both HTML and PDF. All three files (Rmd, HTML and PDF) are available in this repo. 
+
+## Updates
+I have since left the team at HyperGrowth and GrowthBot (GrowthBot's tech is sold to one of our investors and our customer-facing APIs / apps are no longer in service). My email is now inactive. I'm working at [Algoritma](https://algorit.ma) as a course producer teaching an ever larger community about R programming, Python programming, NLP, Machine Learning and Visualization. Connect with me on [Facebook](https://www.facebook.com/onlyphantom) or on [my LinkedIn](https://www.linkedin.com/in/chansamuel/) page instead. 
+
+Enjoy programming!
